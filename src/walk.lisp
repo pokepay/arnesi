@@ -413,6 +413,9 @@
 (defclass lambda-function-form (function-form implicit-progn-with-declare-mixin)
   ((arguments :accessor arguments :initarg :arguments)))
 
+(defclass named-lambda-function-form (lambda-function-form)
+  ((name :accessor name :initarg :name)))
+
 (defclass function-object-form (form)
   ((name :accessor name :initarg :name)))
 
@@ -426,18 +429,37 @@
   ())
 
 (defwalker-handler function (form parent env)
-  (if (and (listp (second form))
-           (eql 'cl:lambda (first (second form))))
-      ;; (function (lambda ...))
-      (walk-lambda (second form) parent env)
-      ;; (function foo)
-      (make-instance (if (lookup-walk-env env :flet (second form))
-                         'local-function-object-form
-                         (if (lookup-walk-env env :lexical-flet (second form))
-                             'lexical-function-object-form
-                             'free-function-object-form))
-                     :name (second form)
-                     :parent parent :source form)))
+  (cond ((not (listp (second form)))
+         ;; (function foo)
+         (make-instance (if (lookup-walk-env env :flet (second form))
+                            'local-function-object-form
+                            (if (lookup-walk-env env :lexical-flet (second form))
+                                'lexical-function-object-form
+                                'free-function-object-form))
+                        :name (second form)
+                        :parent parent :source form))
+        #+sbcl
+        ((eq 'sb-int:named-lambda (first (second form)))
+         ;; (function (sb-int:named-lambda fn-name lambda-list ...body))
+         (walk-named-lambda (second form) parent env))
+        (t
+         ;; (function (lambda ...))
+         (walk-lambda (second form) parent env))))
+
+(defun walk-named-lambda (form parent env)
+  (with-form-object (func named-lambda-function-form
+                          :parent parent
+                          :source form)
+    (multiple-value-setf ((name func))
+      (second form))
+    ;; 1) parse the argument list creating a list of FUNCTION-ARGUMENT-FORM objects
+    (multiple-value-setf ((arguments func) env)
+      (walk-lambda-list (third form) func env))
+    ;; 2) parse the body
+    (multiple-value-setf ((body func) nil (declares func))
+      (walk-implict-progn func (cdddr form) env :declare t))
+    ;; all done
+    func))
 
 (defun walk-lambda (form parent env)
   (with-form-object (func lambda-function-form

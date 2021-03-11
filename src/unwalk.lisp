@@ -50,6 +50,13 @@
      ,@(unwalk-declarations declares)
      ,@(unwalk-forms body))))
 
+#+sbcl
+(defunwalker-handler named-lambda-function-form (name arguments body declares)
+  `(function
+    (sb-int:named-lambda ,name ,(unwalk-lambda-list arguments)
+     ,@(unwalk-declarations declares)
+     ,@(unwalk-forms body))))
+
 (defunwalker-handler function-object-form (name)
   `(function ,name))
 
