@@ -10,9 +10,14 @@
   "When non-NIL any references to undefined functions or
   variables will signal a warning.")
 
+(defgeneric walk-form-aux (dispatcher form parent env))
+
 (defun walk-form (form &optional (parent nil) (env (make-walk-env)))
   "Walk FORM and return a FORM object."
-  (funcall (find-walker-handler form) form parent env))
+  (walk-form-aux (if (atom form)
+                     '+atom-marker+
+                     (first form))
+                 form parent env))
 
 (defun make-walk-env (&optional lexical-env)
   (let (walk-env)
@@ -74,31 +79,16 @@
 
 (defvar +atom-marker+ '+atom-marker+)
 
-(defun find-walker-handler (form)
-  "Simple function which tells us what handler should deal
-  with FORM. Signals an error if we don't have a handler for
-  FORM."
-  (if (atom form)
-      (gethash '+atom-marker+ *walker-handlers*)
-      (aif (gethash (car form) *walker-handlers*)
-           it
-           (case (car form)
-             ((block declare flet function go if labels let let*
-                     macrolet progn quote return-from setq symbol-macrolet
-                     tagbody unwind-protect catch multiple-value-call
-                     multiple-value-prog1 throw load-time-value the
-                     eval-when locally progv)
-              (error "Sorry, No walker for the special operater ~S defined." (car form)))
-             (t (gethash 'application *walker-handlers*))))))
+(defmethod walk-form-aux ((dispatcher t) form parent lexical-env)
+  (walk-form-aux 'application form parent lexical-env))
 
 (defmacro defwalker-handler (name (form parent lexical-env)
                              &body body)
-  `(progn
-     (setf (gethash ',name *walker-handlers*)
-           (lambda (,form ,parent ,lexical-env)
-             (declare (ignorable ,parent ,lexical-env))
-             ,@body))
-     ',name))
+  (with-unique-names (dispatcher)
+    `(progn
+       (defmethod walk-form-aux ((,dispatcher (eql ',name)) ,form ,parent ,lexical-env)
+         ,@body)
+       ',name)))
 
 (defclass form ()
   ((parent :accessor parent :initarg :parent)
@@ -428,19 +418,15 @@
 (defclass lexical-function-object-form (function-object-form)
   ())
 
-(defvar *function-form-walker-handlers* (make-hash-table :test 'eq))
-
-(defun find-function-walker-handler (argument)
-  (gethash argument *function-form-walker-handlers*))
+(defgeneric walk-function-form (dispatcher form parent lexical-env))
 
 (defmacro def-function-walker-handler (name (form parent lexical-env)
                                        &body body)
-  `(progn
-     (setf (gethash ',name *function-form-walker-handlers*)
-           (lambda (,form ,parent ,lexical-env)
-             (declare (ignorable ,parent ,lexical-env))
-             ,@body))
-     ',name))
+  (with-unique-names (dispatcher)
+    `(progn
+       (defmethod walk-function-form ((,dispatcher (eql ',name)) ,form ,parent ,lexical-env)
+         ,@body)
+       ',name)))
 
 (def-function-walker-handler setf (form parent env)
   ;; TODO
@@ -463,8 +449,10 @@
                         :name (second form)
                         :parent parent :source form))
         (t
-         (funcall (find-function-walker-handler (first (second form)))
-                  (second form) parent env))))
+         (walk-function-form (first (second form))
+                             (second form)
+                             parent
+                             env))))
 
 (defun walk-named-lambda (form parent env)
   (with-form-object (func named-lambda-function-form
