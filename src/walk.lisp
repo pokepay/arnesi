@@ -428,6 +428,30 @@
 (defclass lexical-function-object-form (function-object-form)
   ())
 
+(defvar *function-form-walker-handlers* (make-hash-table :test 'eq))
+
+(defun find-function-walker-handler (argument)
+  (gethash argument *function-form-walker-handlers*))
+
+(defmacro def-function-walker-handler (name (form parent lexical-env)
+                                       &body body)
+  `(progn
+     (setf (gethash ',name *function-form-walker-handlers*)
+           (lambda (,form ,parent ,lexical-env)
+             (declare (ignorable ,parent ,lexical-env))
+             ,@body))
+     ',name))
+
+(def-function-walker-handler setf (form parent env)
+  ;; TODO
+  form)
+
+(def-function-walker-handler sb-int:named-lambda (form parent env)
+  (walk-named-lambda form parent env))
+
+(def-function-walker-handler lambda (form parent env)
+  (walk-lambda form parent env))
+
 (defwalker-handler function (form parent env)
   (cond ((not (listp (second form)))
          ;; (function foo)
@@ -438,13 +462,9 @@
                                 'free-function-object-form))
                         :name (second form)
                         :parent parent :source form))
-        #+sbcl
-        ((eq 'sb-int:named-lambda (first (second form)))
-         ;; (function (sb-int:named-lambda fn-name lambda-list ...body))
-         (walk-named-lambda (second form) parent env))
         (t
-         ;; (function (lambda ...))
-         (walk-lambda (second form) parent env))))
+         (funcall (find-function-walker-handler (first (second form)))
+                  (second form) parent env))))
 
 (defun walk-named-lambda (form parent env)
   (with-form-object (func named-lambda-function-form
