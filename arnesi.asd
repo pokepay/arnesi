@@ -10,6 +10,7 @@
                 :components ((:file "asdf" :depends-on ("packages" "io"))
                              (:file "csv" :depends-on ("packages" "string"))
                              (:file "compat" :depends-on ("packages"))
+                             #+(or)
                              (:module "call-cc"
                               :components ((:file "interpreter")
                                            (:file "handlers")
