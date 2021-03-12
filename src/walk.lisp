@@ -268,15 +268,53 @@
                                         :type-form (first arguments))
                          var `(type ,(first arguments))))
             (t
-             (extend-env (var arguments)
-                         (make-instance 'type-declaration-form
-                                        :parent parent
-                                        :source `(,type ,var)
-                                        :name var
-                                        :type-form type)
-                         var `(type ,type)))))))
-    (when (null declares)
-      (setq declares (list (make-instance 'declaration-form :parent parent :source declaration))))
+             (unless (progn #+sbcl (find (package-name (symbol-package type))
+                                         '(:sb-int)
+                                         :key #'package-name
+                                         :test #'string=)
+                            #-sbcl nil)
+               (extend-env (var arguments)
+                           (make-instance 'type-declaration-form
+                                          :parent parent
+                                          :source `(,type ,var)
+                                          :name var
+                                          :type-form type)
+                           var `(type ,type))))))))
+    #+XXX
+    (progn
+      (arnesi:walk-form
+       '(macrolet ((foo (list)
+                    (loop for elt in list
+                          collect elt)))
+         (foo '(1 2 3))))
+      ;; 上の入力はsbclでは下のようにマクロ展開する
+      (MACROLET ((FOO (LIST)
+                   (BLOCK NIL
+                     (LET ((ELT NIL) (#:LOOP-LIST-7105 LIST))
+                       (DECLARE (IGNORABLE #:LOOP-LIST-7105)
+                                (IGNORABLE ELT))
+                       (LET* ((#:LOOP-LIST-HEAD-7106 (LIST NIL))
+                              (#:LOOP-LIST-TAIL-7107 #:LOOP-LIST-HEAD-7106))
+                         (DECLARE
+                          (SB-INT:TRULY-DYNAMIC-EXTENT #:LOOP-LIST-HEAD-7106))
+                         (TAGBODY
+                          SB-LOOP::NEXT-LOOP
+                           (IF (ENDP #:LOOP-LIST-7105)
+                               (GO SB-LOOP::END-LOOP))
+                           (SETQ ELT (CAR #:LOOP-LIST-7105))
+                           (SETQ #:LOOP-LIST-7105 (CDR #:LOOP-LIST-7105))
+                           (RPLACD #:LOOP-LIST-TAIL-7107
+                             (SETQ #:LOOP-LIST-TAIL-7107 (LIST ELT)))
+                           (GO SB-LOOP::NEXT-LOOP)
+                          SB-LOOP::END-LOOP
+                           (RETURN-FROM NIL (CDR #:LOOP-LIST-HEAD-7106))))))))
+        '(1 2 3))
+      ;; macroletのbodyをwalkするとき、macroletにあるマクロを展開してwalkする
+      ;; このときunwalk-formを使うがこのwalkerはdeclareのsb-int:truly-dynamic-extentを知らない事が原因で
+      ;; エラーになってしまう
+      ;; とりあえずは下の式をコメントアウトすることで回避できる
+      (when (null declares)
+        (setq declares (list (make-instance 'declaration-form :parent parent :source declaration)))))
     (values environment declares)))
 
 (defun walk-implict-progn (parent forms env &key docstring declare)
