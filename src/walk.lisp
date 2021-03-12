@@ -432,6 +432,7 @@
   ;; TODO
   form)
 
+#+sbcl
 (def-function-walker-handler sb-int:named-lambda (form parent env)
   (walk-named-lambda form parent env))
 
