@@ -10,7 +10,7 @@
   (:documentation "Unwalk FORM and return a list representation."))
 
 (defmacro defunwalker-handler (class (&rest slots) &body body)
-  (arnesi:with-unique-names (form)
+  (alexandria:with-unique-names (form)
     `(progn
        (defmethod unwalk-form ((,form ,class))
 	 (with-slots ,slots ,form
