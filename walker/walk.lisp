@@ -12,7 +12,7 @@
 
 (defgeneric walk-form-aux (dispatcher form parent env))
 
-(defun walk-form (form &optional (parent nil) (env (arnesi:make-walk-env)))
+(defun walk-form (form &optional (parent nil) (env (make-walk-env)))
   "Walk FORM and return a FORM object."
   (walk-form-aux (if (atom form)
                      '+atom-marker+
