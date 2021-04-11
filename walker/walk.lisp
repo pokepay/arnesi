@@ -22,26 +22,26 @@
 (defun make-walk-env (&optional lexical-env)
   (let (walk-env)
     (when lexical-env
-      (dolist (var (arnesi::lexical-variables lexical-env))
+      (dolist (var (lexical-variables lexical-env))
         (arnesi::extend walk-env :lexical-let var t))
       ;; (dolist (var (lexical-variables lexical-env))
       ;;   (extend walk-env :lexical-let var t))
-      (dolist (fun (arnesi::lexical-functions lexical-env))
+      (dolist (fun (lexical-functions lexical-env))
         (arnesi::extend walk-env :lexical-flet fun t))
-      (dolist (mac (arnesi::lexical-macros lexical-env))
+      (dolist (mac (lexical-macros lexical-env))
         (arnesi::extend walk-env :macrolet (car mac) (cdr mac)))
-      (dolist (smac (arnesi::lexical-symbol-macros lexical-env))
+      (dolist (smac (lexical-symbol-macros lexical-env))
         (arnesi::extend walk-env :symbol-macrolet (car smac) (cdr smac))))
     (cons walk-env lexical-env)))
 
 (defun register-walk-env (env type name datum &rest other-datum)
   (let ((walk-env (arnesi::register (car env) type name datum))
         (lexenv (case type
-                  (:let (arnesi::augment-with-variable (cdr env) name))
-                  (:lexical-let (arnesi::augment-with-variable (cdr env) name))
-                  (:macrolet (arnesi::augment-with-macro (cdr env) name datum))
-                  (:flet (arnesi::augment-with-function (cdr env) name))
-                  (:symbol-macrolet (arnesi::augment-with-symbol-macro (cdr env) name datum))
+                  (:let (augment-with-variable (cdr env) name))
+                  (:lexical-let (augment-with-variable (cdr env) name))
+                  (:macrolet (augment-with-macro (cdr env) name datum))
+                  (:flet (augment-with-function (cdr env) name))
+                  (:symbol-macrolet (augment-with-symbol-macro (cdr env) name datum))
                   ;;TODO: :declare
                   (t (cdr env)))))
     (cons walk-env lexenv)))
@@ -151,7 +151,7 @@
                         ;; declare form
                         (let ((declarations (rest form)))
                           (arnesi:dolist* (dec declarations)
-                            (multiple-value-setf (env newdecls) (arnesi::parse-declaration dec env parent))
+                            (multiple-value-setf (env newdecls) (parse-declaration dec env parent))
                             (setf decls (append newdecls decls))))
                         ;; source code, all done
                         (done)))
@@ -852,7 +852,7 @@
   (with-form-object (macrolet macrolet-form :parent parent :source form
                       :binds '())
     (arnesi:dolist* ((name args &body body) (second form))
-      (let ((handler (arnesi::parse-macro-definition name args body (cdr env))))
+      (let ((handler (parse-macro-definition name args body (cdr env))))
         (extend-walk-env env :macrolet name handler)
         (push (cons name handler) (binds macrolet))))
     (setf (binds macrolet) (nreverse (binds macrolet)))
