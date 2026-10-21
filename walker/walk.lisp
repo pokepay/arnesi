@@ -268,8 +268,10 @@
                                         :type-form (first arguments))
                          var `(type ,(first arguments))))
             (t
+             ;; SBCL が LOOP などの展開に入れる処理系内部の宣言は型宣言ではない
+             ;; (sb-int:truly-dynamic-extent や、2.6.9 の LOOP collect が出す sb-c::no-debug)
              (unless (progn #+sbcl (find (package-name (symbol-package type))
-                                         '(:sb-int)
+                                         '(:sb-int :sb-c)
                                          :key #'package-name
                                          :test #'string=)
                             #-sbcl nil)
